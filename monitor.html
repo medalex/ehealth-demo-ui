@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>eHealth · Live Monitor</title>
+  <style>
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1c2128;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #7d8590;
+      --green:  #3fb950;
+      --red:    #f85149;
+      --yellow: #d29922;
+      --blue:   #58a6ff;
+      --purple: #bc8cff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ──────────────────────────────────────── */
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-weight: 700;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .svcs { display: flex; gap: 7px; flex-wrap: wrap; }
+    .svc {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--muted);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 8px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border); flex-shrink: 0;
+      transition: background .3s, box-shadow .3s;
+    }
+    .dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.fail { background: var(--red); }
+
+    .live {
+      margin-left: auto; display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--green); white-space: nowrap;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+    .last-update { color: var(--muted); font-size: 11px; }
+
+    /* ── Layout ───────────────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 330px;
+      gap: 10px;
+      padding: 10px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 10px; font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase; letter-spacing: .6px;
+      flex-shrink: 0;
+    }
+    .panel-body { flex: 1; overflow-y: auto; padding: 10px; }
+
+    /* ── Timeline ─────────────────────────────────────── */
+    .ev {
+      display: flex; gap: 9px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      animation: slideIn .25s ease;
+    }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+    .ev-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; padding-top: 1px; }
+    .ev-body { flex: 1; min-width: 0; }
+    .ev-title {
+      font-size: 12px; font-weight: 500; margin-bottom: 2px;
+      line-height: 1.3;
+    }
+    .ev-title.ok     { color: var(--green); }
+    .ev-title.fail   { color: var(--red); }
+    .ev-title.info   { color: var(--blue); }
+    .ev-title.warn   { color: var(--yellow); }
+    .ev-title.normal { color: var(--text); }
+    .ev-meta {
+      font-size: 10px; color: var(--muted);
+      font-family: monospace; word-break: break-all;
+      line-height: 1.4;
+    }
+    .ev-time { font-size: 10px; color: var(--muted); flex-shrink: 0; font-family: monospace; padding-top: 2px; }
+    .empty { text-align: center; color: var(--muted); font-size: 11px; padding: 24px 0; }
+
+    /* ── Right panel ──────────────────────────────────── */
+    .section { margin-bottom: 14px; }
+    .sec-title {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .6px; margin-bottom: 7px;
+    }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .stat {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 5px; padding: 7px 9px;
+    }
+    .stat-val {
+      font-size: 22px; font-weight: 700; line-height: 1;
+      color: var(--text);
+    }
+    .stat-val.g { color: var(--green); }
+    .stat-val.r { color: var(--red); }
+    .stat-val.b { color: var(--blue); }
+    .stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* ZKP box */
+    .zkp-box {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 5px; padding: 9px;
+    }
+    .zkp-outcome { font-size: 14px; font-weight: 700; margin-bottom: 7px; }
+    .zkp-outcome.pass { color: var(--green); }
+    .zkp-outcome.fail { color: var(--red); }
+    .zkp-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: flex-start; }
+    .zkp-lbl { color: var(--muted); flex-shrink: 0; width: 78px; font-size: 10px; padding-top: 1px; }
+    .zkp-val { font-family: monospace; font-size: 10px; color: var(--text); word-break: break-all; flex: 1; }
+    .zkp-val.g { color: var(--green); }
+    .zkp-val.p { color: var(--purple); }
+    .sig-badge {
+      display: inline-block; font-family: monospace; font-size: 9px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 3px; padding: 1px 5px; margin: 1px 2px 1px 0;
+      color: var(--purple); max-width: 100%; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+    }
+
+    /* DKG credential */
+    .cred-box {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 5px; padding: 8px; margin-bottom: 6px;
+    }
+    .cred-name { font-weight: 600; font-size: 12px; margin-bottom: 3px; }
+    .cred-spec { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+    .cred-ual { font-family: monospace; font-size: 10px; word-break: break-all; }
+    .cred-ual.ok  { color: var(--blue); }
+    .cred-ual.no  { color: var(--yellow); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">eHealth · Live Monitor</div>
+  <div class="svcs">
+    <div class="svc"><span class="dot" id="d-patient"></span>patient-api</div>
+    <div class="svc"><span class="dot" id="d-lab"></span>lab-api</div>
+    <div class="svc"><span class="dot" id="d-hospital"></span>hospital-api</div>
+    <div class="svc"><span class="dot" id="d-pharmacy"></span>pharmacy-api</div>
+    <div class="svc"><span class="dot" id="d-zkp"></span>zkp-prover</div>
+    <div class="svc"><span class="dot" id="d-dkg"></span>DKG / blockchain</div>
+  </div>
+  <div class="live">
+    <span class="live-dot"></span>
+    LIVE
+    <span class="last-update" id="upd"></span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Left: timeline -->
+  <div class="panel">
+    <div class="panel-head">Event Timeline</div>
+    <div class="panel-body" id="timeline">
+      <div class="empty">Monitoring active — waiting for events…</div>
+    </div>
+  </div>
+
+  <!-- Right: state -->
+  <div class="panel">
+    <div class="panel-head">System State</div>
+    <div class="panel-body">
+
+      <div class="section">
+        <div class="sec-title">Counts</div>
+        <div class="stats">
+          <div class="stat"><div class="stat-val b" id="c-patients">—</div><div class="stat-lbl">Patients</div></div>
+          <div class="stat"><div class="stat-val b" id="c-lab">—</div><div class="stat-lbl">Lab Results</div></div>
+          <div class="stat"><div class="stat-val g" id="c-pass">—</div><div class="stat-lbl">ZKP PASS</div></div>
+          <div class="stat"><div class="stat-val r" id="c-fail">—</div><div class="stat-lbl">ZKP FAIL</div></div>
+          <div class="stat"><div class="stat-val" id="c-pend">—</div><div class="stat-lbl">Pharmacy Queue</div></div>
+          <div class="stat"><div class="stat-val g" id="c-done">—</div><div class="stat-lbl">Verified</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="sec-title">Latest ZKP Proof</div>
+        <div id="zkp-panel"><div class="empty">No proofs yet</div></div>
+      </div>
+
+      <div class="section">
+        <div class="sec-title">DKG Doctor Credentials</div>
+        <div id="dkg-panel"><div class="empty">Loading…</div></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BASE = {
+  patient:  'http://localhost:3001',
+  lab:      'http://localhost:3002',
+  hospital: 'http://localhost:3003',
+  pharmacy: 'http://localhost:3004',
+  zkp:      'http://localhost:3005',
+  mfssia:   'http://localhost:4000',
+};
+
+const DRUGS = {103:'Penicillin', 105:'Metformin'};
+const drugName = id => DRUGS[id] || `Drug #${id}`;
+
+// ── state ────────────────────────────────────────────────────────────────────
+
+const seen = {
+  patients:   new Set(),
+  lab:        new Set(),
+  rxHosp:     new Map(),    // id → {outcome, stmtHash}
+  rxPharm:    new Map(),    // id → status
+  doctors:    new Map(),    // id → credentialUal
+};
+
+let events = [];
+let latestProof = null;
+let doctors = [];
+let firstPoll = true;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+const get = async url => {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(2500) });
+    return r.ok ? r.json() : null;
+  } catch { return null; }
+};
+
+const ping = async url => {
+  try { const r = await fetch(url, { signal: AbortSignal.timeout(2000) }); return r.ok; }
+  catch { return false; }
+};
+
+const fmt = ts => new Date(ts).toLocaleTimeString();
+
+function push(ev) {
+  ev.ts = ev.ts || Date.now();
+  events.unshift(ev);
+  if (events.length > 200) events.pop();
+  renderTimeline();
+}
+
+// ── health ────────────────────────────────────────────────────────────────────
+
+async function health() {
+  const checks = [
+    ['patient',  `${BASE.patient}/api/patients`],
+    ['lab',      `${BASE.lab}/api/results`],
+    ['hospital', `${BASE.hospital}/api/doctors`],
+    ['pharmacy', `${BASE.pharmacy}/api/prescriptions`],
+    ['zkp',      `${BASE.zkp}/health`],
+    ['dkg',      `${BASE.mfssia}/api/infrastructure/healthcheck`],
+  ];
+  await Promise.all(checks.map(async ([k, url]) => {
+    const ok = await ping(url);
+    const el = document.getElementById(`d-${k}`);
+    if (el) el.className = `dot ${ok ? 'ok' : 'fail'}`;
+  }));
+}
+
+// ── pollers ───────────────────────────────────────────────────────────────────
+
+async function pollPatients() {
+  const data = await get(`${BASE.patient}/api/patients`);
+  if (!data) return;
+  document.getElementById('c-patients').textContent = data.length;
+  if (firstPoll) { data.forEach(p => seen.patients.add(p.id)); return; }
+  for (const p of data) {
+    if (!seen.patients.has(p.id)) {
+      seen.patients.add(p.id);
+      push({ icon:'👤', cls:'info',
+        title: `Patient registered: ${p.firstName} ${p.lastName}`,
+        meta: `ID: ${p.id}`,
+        ts: new Date(p.createdAt||Date.now()).getTime() });
+    }
+  }
+}
+
+async function pollLab() {
+  const data = await get(`${BASE.lab}/api/results`);
+  if (!data) return;
+  document.getElementById('c-lab').textContent = data.length;
+  if (firstPoll) { data.forEach(r => seen.lab.add(r.id)); return; }
+  for (const r of data) {
+    if (!seen.lab.has(r.id)) {
+      seen.lab.add(r.id);
+      push({ icon:'🔬', cls:'info',
+        title: `Lab result: ${r.metric} = ${r.value} ${r.unit}`,
+        meta: r.dkgUal ? `⛓ DKG: ${r.dkgUal}` : `Patient: ${r.patientId?.slice(0,8)}…  · Lab: ${r.measuredBy}`,
+        ts: new Date(r.createdAt||Date.now()).getTime() });
+    }
+  }
+}
+
+async function pollDoctors() {
+  const data = await get(`${BASE.hospital}/api/doctors`);
+  if (!data) return;
+  doctors = data;
+  for (const d of data) {
+    const prev = seen.doctors.get(d.id);
+    if (prev === undefined) {
+      seen.doctors.set(d.id, d.credentialUal || null);
+    } else if (!prev && d.credentialUal) {
+      seen.doctors.set(d.id, d.credentialUal);
+      if (!firstPoll) {
+        push({ icon:'⛓️', cls:'ok',
+          title: `Dr. ${d.firstName} ${d.lastName} registered on DKG`,
+          meta: `UAL: ${d.credentialUal}`,
+          ts: Date.now() });
+      }
+    }
+  }
+  renderDKG();
+}
+
+async function pollHospitalRx() {
+  const data = await get(`${BASE.hospital}/api/prescriptions`);
+  if (!data) return;
+  document.getElementById('c-pass').textContent = data.filter(r=>r.outcome===true).length;
+  document.getElementById('c-fail').textContent = data.filter(r=>r.outcome===false).length;
+
+  // always track latest proof
+  const passes = data.filter(r=>r.outcome===true)
+                     .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  if (passes.length) {
+    if (!latestProof || passes[0].id !== latestProof.id) {
+      latestProof = passes[0];
+      renderZKP();
+    }
+  }
+
+  if (firstPoll) { data.forEach(r => seen.rxHosp.set(r.id, {outcome:r.outcome, stmtHash:r.stmtHash})); return; }
+
+  for (const rx of data) {
+    if (!seen.rxHosp.has(rx.id)) {
+      seen.rxHosp.set(rx.id, {outcome:rx.outcome, stmtHash:rx.stmtHash});
+      const drug = `${drugName(rx.drugId)} ${rx.dosage}`;
+      if (rx.outcome === true) {
+        const proofBytes = new Blob([rx.proofJson||'']).size;
+        const proofKb = proofBytes > 0 ? ` · proof ${(proofBytes/1024).toFixed(1)} KB` : '';
+        push({ icon:'🔐', cls:'ok',
+          title: `ZKP PASS — ${drug}`,
+          meta: `stmtHash: ${rx.stmtHash?.slice(0,40)}…${proofKb}`,
+          ts: new Date(rx.createdAt||Date.now()).getTime() });
+      } else if (rx.outcome === false) {
+        push({ icon:'❌', cls:'fail',
+          title: `ZKP FAIL — ${drug}`,
+          meta: `Prescription rejected by circuit`,
+          ts: new Date(rx.createdAt||Date.now()).getTime() });
+      }
+    }
+  }
+}
+
+async function pollPharmacyRx() {
+  const data = await get(`${BASE.pharmacy}/api/prescriptions`);
+  if (!data) return;
+  document.getElementById('c-pend').textContent = data.filter(r=>r.status==='Received').length;
+  document.getElementById('c-done').textContent = data.filter(r=>r.status==='Verified'||r.status==='Dispensed').length;
+
+  if (firstPoll) { data.forEach(r => seen.rxPharm.set(r.id, r.status)); return; }
+
+  for (const rx of data) {
+    const drug = rx.drugName || drugName(rx.drugId);
+    const prev = seen.rxPharm.get(rx.id);
+
+    if (prev === undefined) {
+      seen.rxPharm.set(rx.id, rx.status);
+      push({ icon:'💊', cls:'normal',
+        title: `Pharmacy received: ${drug}`,
+        meta: `stmtHash: ${rx.stmtHash?.slice(0,30)}…`,
+        ts: new Date(rx.createdAt||Date.now()).getTime() });
+    } else if (prev !== rx.status) {
+      seen.rxPharm.set(rx.id, rx.status);
+      if (rx.status === 'Verified') {
+        push({ icon:'✅', cls:'ok',
+          title: `Pharmacy VERIFIED — ${drug}`,
+          meta: `ZKP proof cryptographically verified` });
+      } else if (rx.status === 'Rejected') {
+        push({ icon:'🚫', cls:'fail',
+          title: `Pharmacy REJECTED — ${drug}`,
+          meta: `ZKP verification failed at pharmacy` });
+      } else if (rx.status === 'Dispensed') {
+        push({ icon:'🟢', cls:'ok',
+          title: `Dispensed to patient — ${drug}`,
+          meta: `Prescription fulfilled` });
+      }
+    }
+  }
+}
+
+// ── renderers ─────────────────────────────────────────────────────────────────
+
+function renderTimeline() {
+  const el = document.getElementById('timeline');
+  if (!events.length) { el.innerHTML = '<div class="empty">Monitoring active — waiting for events…</div>'; return; }
+  el.innerHTML = events.map(ev => `
+    <div class="ev">
+      <div class="ev-icon">${ev.icon}</div>
+      <div class="ev-body">
+        <div class="ev-title ${ev.cls}">${ev.title}</div>
+        ${ev.meta ? `<div class="ev-meta">${ev.meta}</div>` : ''}
+      </div>
+      <div class="ev-time">${fmt(ev.ts)}</div>
+    </div>`).join('');
+}
+
+function renderZKP() {
+  const el = document.getElementById('zkp-panel');
+  if (!latestProof) { el.innerHTML = '<div class="empty">No proofs yet</div>'; return; }
+  const rx = latestProof;
+  const drug = `${drugName(rx.drugId)} ${rx.dosage}mg`;
+
+  let sigs = [];
+  try { sigs = JSON.parse(rx.publicSignalsJson || '[]'); } catch {}
+
+  let proofKb = '—';
+  try {
+    const b = new Blob([rx.proofJson||'']).size;
+    if (b > 0) proofKb = `${(b/1024).toFixed(1)} KB`;
+  } catch {}
+
+  // Показываем первые 4 публичных сигнала как badges
+  const sigBadges = sigs.slice(0,4).map(s => {
+    const str = String(s);
+    return `<span class="sig-badge" title="${str}">${str.length>18 ? str.slice(0,8)+'…'+str.slice(-6) : str}</span>`;
+  }).join('') + (sigs.length > 4 ? `<span class="sig-badge">+${sigs.length-4} more</span>` : '');
+
+  el.innerHTML = `
+    <div class="zkp-box">
+      <div class="zkp-outcome ${rx.outcome ? 'pass' : 'fail'}">
+        ${rx.outcome ? '✓ PASS' : '✗ FAIL'} — ${drug}
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">stmtHash</span>
+        <span class="zkp-val g">${rx.stmtHash || '—'}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">proof size</span>
+        <span class="zkp-val">${proofKb}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">public signals</span>
+        <span class="zkp-val">${sigs.length} values<br>${sigBadges}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">patient</span>
+        <span class="zkp-val">${rx.patientId?.slice(0,8)}…</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">created</span>
+        <span class="zkp-val">${rx.createdAt ? new Date(rx.createdAt).toLocaleString() : '—'}</span>
+      </div>
+    </div>`;
+}
+
+function renderDKG() {
+  const el = document.getElementById('dkg-panel');
+  if (!doctors.length) { el.innerHTML = '<div class="empty">No doctors</div>'; return; }
+  el.innerHTML = doctors.map(d => `
+    <div class="cred-box">
+      <div class="cred-name">${d.firstName} ${d.lastName}</div>
+      <div class="cred-spec">${d.specialty} · ${d.licenseNumber}</div>
+      ${d.credentialUal
+        ? `<div class="cred-ual ok">✓ ${d.credentialUal}</div>`
+        : `<div class="cred-ual no">⚠ Not registered on DKG</div>`}
+    </div>`).join('');
+}
+
+// ── loop ──────────────────────────────────────────────────────────────────────
+
+async function tick() {
+  await Promise.allSettled([
+    pollPatients(),
+    pollLab(),
+    pollDoctors(),
+    pollHospitalRx(),
+    pollPharmacyRx(),
+    health(),
+  ]);
+
+  if (firstPoll) {
+    // После первого прохода — показываем ZKP и DKG, но timeline остаётся чистым
+    renderZKP();
+    renderDKG();
+    firstPoll = false;
+  }
+
+  document.getElementById('upd').textContent = new Date().toLocaleTimeString();
+  setTimeout(tick, 1500);
+}
+
+tick();
+</script>
+</body>
+</html>

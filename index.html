@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>eHealth Demo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .navbar-brand { font-weight: 700; letter-spacing: 1px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .dot-ok { background: #28a745; }
+    .dot-fail { background: #dc3545; }
+    .dot-unknown { background: #aaa; }
+    .tab-pane { padding-top: 1.5rem; }
+    .table-sm td, .table-sm th { font-size: 0.82rem; vertical-align: middle; }
+    .proof-badge { font-size: 0.7rem; font-family: monospace; word-break: break-all; }
+    .section-card { margin-bottom: 1.5rem; }
+    .btn-xs { padding: .15rem .4rem; font-size: .75rem; }
+    pre.json-out { background:#1e1e1e; color:#d4d4d4; border-radius:6px; padding:12px; font-size:.78rem; max-height:200px; overflow:auto; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3 mb-0">
+  <span class="navbar-brand">eHealth Demo</span>
+  <div id="statusBar" class="d-flex gap-3 text-white small"></div>
+</nav>
+
+<div class="container-fluid px-4 py-3">
+  <ul class="nav nav-tabs" id="mainTabs">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-patients">Patients</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-lab">Lab</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-hospital">Hospital</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pharmacy">Pharmacy</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-zkp">ZKP Prover</a></li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ── PATIENTS ──────────────────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tab-patients">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="card section-card">
+            <div class="card-header">Create Patient</div>
+            <div class="card-body">
+              <input class="form-control form-control-sm mb-2" id="p-firstName" placeholder="First name">
+              <input class="form-control form-control-sm mb-2" id="p-lastName" placeholder="Last name">
+              <input class="form-control form-control-sm mb-2" id="p-dob" type="date" value="1990-05-15">
+              <select class="form-select form-select-sm mb-2" id="p-gender">
+                <option>Male</option><option selected>Female</option><option>Other</option>
+              </select>
+              <input class="form-control form-control-sm mb-2" id="p-email" placeholder="Email" value="patient@demo.com">
+              <button class="btn btn-primary btn-sm w-100" onclick="createPatient()">Create</button>
+              <div id="p-result" class="mt-2"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              Patients
+              <button class="btn btn-outline-secondary btn-sm" onclick="loadPatients()">Refresh</button>
+            </div>
+            <div class="card-body p-0">
+              <table class="table table-sm table-hover mb-0" id="patients-table">
+                <thead><tr><th>ID</th><th>Name</th><th>DOB</th><th>Gender</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LAB ──────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-lab">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="card section-card">
+            <div class="card-header">Add Lab Result</div>
+            <div class="card-body">
+              <input class="form-control form-control-sm mb-2" id="l-patientId" placeholder="Patient ID (UUID)">
+              <select class="form-select form-select-sm mb-2" id="l-loincCode">
+                <option value="33914-3">33914-3 — eGFR CKD-EPI</option>
+                <option value="2164-2">2164-2 — eGFR Cockcroft-Gault</option>
+              </select>
+              <select class="form-select form-select-sm mb-2" id="l-formula">
+                <option value="0">CkdEpi</option>
+                <option value="1">CockcroftGault</option>
+                <option value="2">Other</option>
+              </select>
+              <input class="form-control form-control-sm mb-2" id="l-metric" placeholder="Metric" value="eGFR">
+              <input class="form-control form-control-sm mb-2" id="l-value" placeholder="Value" type="number" value="65">
+              <input class="form-control form-control-sm mb-2" id="l-unit" placeholder="Unit" value="mL/min/1.73m²">
+              <input class="form-control form-control-sm mb-2" id="l-measuredBy" placeholder="Lab name" value="City Lab">
+              <button class="btn btn-primary btn-sm w-100" onclick="createLabResult()">Submit</button>
+              <div id="l-result" class="mt-2"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              Lab Results
+              <button class="btn btn-outline-secondary btn-sm" onclick="loadLabResults()">Refresh</button>
+            </div>
+            <div class="card-body p-0">
+              <table class="table table-sm table-hover mb-0" id="lab-table">
+                <thead><tr><th>Patient</th><th>LOINC</th><th>Metric</th><th>Value</th><th>Unit</th><th>DKG UAL</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HOSPITAL ──────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-hospital">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="card section-card">
+            <div class="card-header">Doctors</div>
+            <div class="card-body p-0">
+              <table class="table table-sm mb-0" id="doctors-table">
+                <thead><tr><th>Name</th><th>Specialty</th><th>Credential</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card section-card">
+            <div class="card-header">Create Prescription (ZKP)</div>
+            <div class="card-body">
+              <label class="form-label small">Doctor</label>
+              <select class="form-select form-select-sm mb-2" id="rx-doctorId"></select>
+              <label class="form-label small">Patient ID</label>
+              <input class="form-control form-control-sm mb-2" id="rx-patientId" placeholder="Paste patient UUID">
+              <label class="form-label small">Drug</label>
+              <select class="form-select form-select-sm mb-2" id="rx-drugId">
+                <option value="101">101 — Ibuprofen</option>
+                <option value="102">102 — Aspirin</option>
+                <option value="103">103 — Penicillin ⚠️ allergy</option>
+                <option value="104">104 — Paracetamol</option>
+              </select>
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <input class="form-control form-control-sm" id="rx-dosage" placeholder="Dosage" value="8">
+                </div>
+                <div class="col-6">
+                  <input class="form-control form-control-sm" id="rx-patientAge" placeholder="Age" type="number" value="12">
+                </div>
+              </div>
+              <input class="form-control form-control-sm mb-2" id="rx-workflowId" placeholder="Workflow ID" type="number" value="77">
+              <button class="btn btn-success btn-sm w-100" onclick="createPrescription()">
+                Create &amp; Prove ZKP
+              </button>
+              <div id="rx-spinner" class="text-center mt-2 d-none">
+                <div class="spinner-border spinner-border-sm text-success"></div>
+                <span class="ms-2 small">Generating proof…</span>
+              </div>
+              <div id="rx-result" class="mt-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-8">
+          <div class="card section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              Prescriptions
+              <button class="btn btn-outline-secondary btn-sm" onclick="loadHospitalPrescriptions()">Refresh</button>
+            </div>
+            <div class="card-body p-0">
+              <table class="table table-sm table-hover mb-0" id="hospital-rx-table">
+                <thead><tr><th>ID</th><th>Drug</th><th>Dosage</th><th>Patient</th><th>Outcome</th><th>stmtHash</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PHARMACY ──────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-pharmacy">
+      <div class="row">
+        <div class="col-12">
+          <div class="card section-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              Received Prescriptions
+              <button class="btn btn-outline-secondary btn-sm" onclick="loadPharmacyPrescriptions()">Refresh</button>
+            </div>
+            <div class="card-body p-0">
+              <table class="table table-sm table-hover mb-0" id="pharmacy-table">
+                <thead>
+                  <tr>
+                    <th>ID</th><th>Drug</th><th>Dosage</th><th>Patient</th>
+                    <th>Outcome</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ZKP PROVER ────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-zkp">
+      <div class="row">
+        <div class="col-md-5">
+          <div class="card section-card">
+            <div class="card-header">Manual Prove</div>
+            <div class="card-body">
+              <textarea class="form-control font-monospace mb-2" id="zkp-input" rows="14" style="font-size:.75rem">{
+  "workflowId": 77,
+  "doctorCredentialHash": "555",
+  "validCredentialRoot": "12637775194496995754117307235330377055135569056804320597148279303980524724247",
+  "credentialSiblings": ["666","8729492946723542771608110226099589081116106357422917950961108651628306410978","2627613426887678919670906595223549159912332087418882198813349531614684120136"],
+  "credentialPathBits": [0,0,1],
+  "prescribedDrugIds": ["101","104"],
+  "prescribedDosages": ["8","2"],
+  "approvedDrugIds": ["101","102","103","104"],
+  "allergyMatrix": [[0,0,1,0],[0,0,0,0],[0,0,0,0]],
+  "adultMaxDosages": ["20","10","16","4"],
+  "childMaxDosages": ["10","5","8","2"],
+  "patientAge": 12,
+  "prescriptionTimestamp": 1000,
+  "validFor": 50,
+  "currentTimestamp": 1030
+}</textarea>
+              <button class="btn btn-primary btn-sm w-100" onclick="manualProve()">POST /prove</button>
+              <div id="zkp-spinner" class="text-center mt-2 d-none">
+                <div class="spinner-border spinner-border-sm"></div>
+                <span class="ms-2 small">Generating…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div class="card section-card">
+            <div class="card-header">Result</div>
+            <div class="card-body">
+              <div id="zkp-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- tab-content -->
+</div><!-- container -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const PATIENT  = 'http://localhost:3001';
+const LAB      = 'http://localhost:3002';
+const HOSPITAL = 'http://localhost:3003';
+const PHARMACY = 'http://localhost:3004';
+const ZKP      = 'http://localhost:3005';
+const MFSSIA   = 'http://localhost:4000';
+
+const DRUG_NAMES = { 101: 'Ibuprofen', 102: 'Aspirin', 103: 'Penicillin', 104: 'Paracetamol' };
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+async function api(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== null) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`${res.status}: ${txt}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+
+function shortId(id) {
+  return id ? `${id.slice(0,8)}…` : '—';
+}
+
+function alert(el, msg, type = 'danger') {
+  document.getElementById(el).innerHTML =
+    `<div class="alert alert-${type} alert-sm p-2 mb-0" style="font-size:.8rem">${msg}</div>`;
+}
+
+function outcomebadge(v) {
+  if (v === true  || v === 1)  return '<span class="badge bg-success">✓ PASS</span>';
+  if (v === false || v === 0)  return '<span class="badge bg-danger">✗ FAIL</span>';
+  return '<span class="badge bg-secondary">—</span>';
+}
+
+function statusBadge(s) {
+  const map = { Received: 'secondary', Verified: 'success', Rejected: 'danger', Dispensed: 'primary' };
+  return `<span class="badge bg-${map[s] || 'secondary'}">${s}</span>`;
+}
+
+// ── status bar ───────────────────────────────────────────────────────────────
+
+async function checkStatus() {
+  const services = [
+    ['patient',  `${PATIENT}/api/patients`],
+    ['lab',      `${LAB}/api/results`],
+    ['hospital', `${HOSPITAL}/api/doctors`],
+    ['pharmacy', `${PHARMACY}/api/prescriptions`],
+    ['zkp',      `${ZKP}/health`],
+    ['mfssia',   `${MFSSIA}/api/infrastructure/healthcheck`],
+  ];
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = '';
+  for (const [name, url] of services) {
+    let ok = false;
+    try { await fetch(url, { signal: AbortSignal.timeout(3000) }); ok = true; } catch {}
+    bar.innerHTML += `<span><span class="status-dot ${ok ? 'dot-ok' : 'dot-fail'}"></span>${name}</span>`;
+  }
+}
+
+// ── patients ─────────────────────────────────────────────────────────────────
+
+async function loadPatients() {
+  const rows = await api(`${PATIENT}/api/patients`);
+  const tb = document.querySelector('#patients-table tbody');
+  tb.innerHTML = rows.map(p => `
+    <tr>
+      <td><small class="font-monospace" title="${p.id}">${shortId(p.id)}</small></td>
+      <td>${p.firstName} ${p.lastName}</td>
+      <td>${p.dateOfBirth}</td>
+      <td>${p.gender}</td>
+      <td>
+        <button class="btn btn-outline-secondary btn-xs" onclick="copyId('${p.id}')">Copy ID</button>
+        <button class="btn btn-outline-primary btn-xs" onclick="prefillPatient('${p.id}')">Use</button>
+      </td>
+    </tr>`).join('');
+}
+
+function copyId(id) {
+  navigator.clipboard.writeText(id);
+}
+
+function prefillPatient(id) {
+  document.getElementById('rx-patientId').value = id;
+  document.getElementById('l-patientId').value  = id;
+  const tab = new bootstrap.Tab(document.querySelector('[href="#tab-hospital"]'));
+  tab.show();
+}
+
+async function createPatient() {
+  try {
+    const p = await api(`${PATIENT}/api/patients`, 'POST', {
+      firstName: document.getElementById('p-firstName').value || 'Anna',
+      lastName:  document.getElementById('p-lastName').value  || 'Kovalenko',
+      dateOfBirth: document.getElementById('p-dob').value,
+      gender: document.getElementById('p-gender').value,
+      email:  document.getElementById('p-email').value,
+    });
+    alert('p-result', `Created: <b>${p.firstName} ${p.lastName}</b><br>ID: <code>${p.id}</code>`, 'success');
+    loadPatients();
+  } catch(e) { alert('p-result', e.message); }
+}
+
+// ── lab ──────────────────────────────────────────────────────────────────────
+
+async function loadLabResults() {
+  const rows = await api(`${LAB}/api/results`);
+  const tb = document.querySelector('#lab-table tbody');
+  tb.innerHTML = rows.map(r => `
+    <tr>
+      <td><small class="font-monospace" title="${r.patientId}">${shortId(r.patientId)}</small></td>
+      <td>${r.loincCode}</td>
+      <td>${r.metric}</td>
+      <td>${r.value}</td>
+      <td>${r.unit}</td>
+      <td><small class="text-muted">${r.dkgUal ? shortId(r.dkgUal) : '—'}</small></td>
+    </tr>`).join('');
+}
+
+async function createLabResult() {
+  try {
+    const r = await api(`${LAB}/api/results`, 'POST', {
+      patientId:  document.getElementById('l-patientId').value,
+      loincCode:  document.getElementById('l-loincCode').value,
+      formula:    parseInt(document.getElementById('l-formula').value),
+      metric:     document.getElementById('l-metric').value,
+      value:      parseFloat(document.getElementById('l-value').value),
+      unit:       document.getElementById('l-unit').value,
+      measuredBy: document.getElementById('l-measuredBy').value,
+    });
+    alert('l-result', `Saved. DKG UAL: <code>${r.dkgUal || '—'}</code>`, 'success');
+    loadLabResults();
+  } catch(e) { alert('l-result', e.message); }
+}
+
+// ── hospital ─────────────────────────────────────────────────────────────────
+
+async function loadDoctors() {
+  const rows = await api(`${HOSPITAL}/api/doctors`);
+  const tb   = document.querySelector('#doctors-table tbody');
+  const sel  = document.getElementById('rx-doctorId');
+  sel.innerHTML = '';
+  tb.innerHTML = rows.map(d => {
+    sel.innerHTML += `<option value="${d.id}">${d.firstName} ${d.lastName}</option>`;
+    const cred = d.credentialUal
+      ? `<span class="badge bg-success" title="${d.credentialUal}">Registered</span>`
+      : `<span class="badge bg-warning text-dark">Not registered</span>`;
+    const btn = d.credentialUal ? '' :
+      `<button class="btn btn-outline-primary btn-xs" onclick="registerCredential('${d.id}')">Register</button>`;
+    return `<tr>
+      <td>${d.firstName} ${d.lastName}</td>
+      <td>${d.specialty}</td>
+      <td>${cred}</td>
+      <td>${btn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function registerCredential(doctorId) {
+  try {
+    await api(`${HOSPITAL}/api/doctors/${doctorId}/register-credential`, 'POST');
+    alert('rx-result', 'Credential registered on DKG', 'success');
+    loadDoctors();
+  } catch(e) { alert('rx-result', e.message); }
+}
+
+async function loadHospitalPrescriptions() {
+  const rows = await api(`${HOSPITAL}/api/prescriptions`);
+  const tb   = document.querySelector('#hospital-rx-table tbody');
+  tb.innerHTML = rows.map(r => `
+    <tr>
+      <td><small class="font-monospace" title="${r.id}">${shortId(r.id)}</small></td>
+      <td>${DRUG_NAMES[r.drugId] || r.drugId}</td>
+      <td>${r.dosage}</td>
+      <td><small class="font-monospace" title="${r.patientId}">${shortId(r.patientId)}</small></td>
+      <td>${outcomebadge(r.outcome)}</td>
+      <td><small class="font-monospace text-muted">${r.stmtHash ? r.stmtHash.slice(0,16)+'…' : '—'}</small></td>
+      <td>
+        <button class="btn btn-outline-success btn-xs"
+          onclick="sendToPharmacy(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+          → Pharmacy
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+
+async function createPrescription() {
+  const spinner = document.getElementById('rx-spinner');
+  const result  = document.getElementById('rx-result');
+  spinner.classList.remove('d-none');
+  result.innerHTML = '';
+  try {
+    const rx = await api(`${HOSPITAL}/api/prescriptions`, 'POST', {
+      doctorId:   document.getElementById('rx-doctorId').value,
+      patientId:  document.getElementById('rx-patientId').value,
+      drugId:     parseInt(document.getElementById('rx-drugId').value),
+      dosage:     document.getElementById('rx-dosage').value,
+      patientAge: parseInt(document.getElementById('rx-patientAge').value),
+      workflowId: parseInt(document.getElementById('rx-workflowId').value),
+    });
+    result.innerHTML = `
+      <div class="alert alert-success p-2 mb-1" style="font-size:.8rem">
+        <b>Created</b> ${outcomebadge(rx.outcome)}<br>
+        stmtHash: <code style="font-size:.7rem">${rx.stmtHash?.slice(0,20)}…</code>
+      </div>
+      <button class="btn btn-sm btn-outline-success w-100"
+        onclick="sendToPharmacy(${JSON.stringify(rx).replace(/"/g,"'")})">
+        → Send to Pharmacy
+      </button>`;
+    loadHospitalPrescriptions();
+  } catch(e) {
+    result.innerHTML = `<div class="alert alert-danger p-2" style="font-size:.8rem">${e.message}</div>`;
+  } finally {
+    spinner.classList.add('d-none');
+  }
+}
+
+async function sendToPharmacy(rx) {
+  if (typeof rx === 'string') rx = JSON.parse(rx);
+  try {
+    const drugId = rx.drugId ?? rx.DrugId;
+    const received = await api(`${PHARMACY}/api/prescriptions/receive`, 'POST', {
+      drugId:           drugId,
+      drugName:         DRUG_NAMES[drugId] || 'Unknown',
+      dosage:           rx.dosage ?? rx.Dosage,
+      patientId:        rx.patientId ?? rx.PatientId,
+      stmtHash:         rx.stmtHash ?? rx.StmtHash ?? '',
+      proofJson:        rx.proofJson ?? rx.ProofJson ?? '{}',
+      publicSignalsJson: rx.publicSignalsJson ?? rx.PublicSignalsJson ?? '[]',
+      outcome:          rx.outcome ?? rx.Outcome ?? false,
+    });
+    alert('rx-result', `Sent to pharmacy. ID: <code>${received.id}</code>`, 'success');
+    loadPharmacyPrescriptions();
+    const tab = new bootstrap.Tab(document.querySelector('[href="#tab-pharmacy"]'));
+    tab.show();
+  } catch(e) { alert('rx-result', e.message); }
+}
+
+// ── pharmacy ─────────────────────────────────────────────────────────────────
+
+async function loadPharmacyPrescriptions() {
+  const rows = await api(`${PHARMACY}/api/prescriptions`);
+  const tb   = document.querySelector('#pharmacy-table tbody');
+  tb.innerHTML = rows.map(r => {
+    const canVerify  = r.status === 'Received';
+    const canDispense = r.status === 'Verified';
+    return `<tr>
+      <td><small class="font-monospace" title="${r.id}">${shortId(r.id)}</small></td>
+      <td>${r.drugName || DRUG_NAMES[r.drugId] || r.drugId}</td>
+      <td>${r.dosage}</td>
+      <td><small class="font-monospace" title="${r.patientId}">${shortId(r.patientId)}</small></td>
+      <td>${outcomebadge(r.outcome)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>
+        ${canVerify  ? `<button class="btn btn-warning btn-xs me-1" onclick="verifyRx('${r.id}')">Verify ZKP</button>` : ''}
+        ${canDispense ? `<button class="btn btn-success btn-xs" onclick="dispenseRx('${r.id}')">Dispense</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function verifyRx(id) {
+  try {
+    const res = await api(`${PHARMACY}/api/prescriptions/${id}/verify`, 'POST');
+    loadPharmacyPrescriptions();
+  } catch(e) { console.error(e); }
+}
+
+async function dispenseRx(id) {
+  try {
+    await api(`${PHARMACY}/api/prescriptions/${id}/dispense`, 'POST');
+    loadPharmacyPrescriptions();
+  } catch(e) { console.error(e); }
+}
+
+// ── zkp manual ───────────────────────────────────────────────────────────────
+
+async function manualProve() {
+  const spinner = document.getElementById('zkp-spinner');
+  spinner.classList.remove('d-none');
+  try {
+    const body = JSON.parse(document.getElementById('zkp-input').value);
+    const res  = await api(`${ZKP}/prove`, 'POST', body);
+    document.getElementById('zkp-result').innerHTML = `
+      <div class="mb-2">${outcomebadge(res.outcome)} outcome=${res.outcome}</div>
+      <div class="mb-1 small"><b>stmtHash:</b> <code>${res.stmtHash}</code></div>
+      <div class="mb-1 small"><b>nonce:</b> <code>${res.nonce}</code></div>
+      <div class="small fw-bold mb-1">proof:</div>
+      <pre class="json-out">${JSON.stringify(res.proof, null, 2)}</pre>`;
+  } catch(e) {
+    document.getElementById('zkp-result').innerHTML =
+      `<div class="alert alert-danger p-2">${e.message}</div>`;
+  } finally {
+    spinner.classList.add('d-none');
+  }
+}
+
+// ── init ─────────────────────────────────────────────────────────────────────
+
+document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+  tab.addEventListener('shown.bs.tab', e => {
+    const target = e.target.getAttribute('href');
+    if (target === '#tab-patients')  loadPatients();
+    if (target === '#tab-lab')       loadLabResults();
+    if (target === '#tab-hospital')  { loadDoctors(); loadHospitalPrescriptions(); }
+    if (target === '#tab-pharmacy')  loadPharmacyPrescriptions();
+  });
+});
+
+checkStatus();
+loadPatients();
+loadDoctors();
+</script>
+</body>
+</html>
