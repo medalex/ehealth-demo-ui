@@ -308,7 +308,7 @@ async function health() {
     ['hospital', `${BASE.hospital}/api/doctors`],
     ['pharmacy', `${BASE.pharmacy}/api/prescriptions`],
     ['zkp',      `${BASE.zkp}/health`],
-    ['dkg',      `${BASE.mfssia}/api/infrastructure/healthcheck`],
+    ['dkg',      `${BASE.mfssia}/api/api/infrastructure/healthcheck`],
   ];
   await Promise.all(checks.map(async ([k, url]) => {
     const ok = await ping(url);
