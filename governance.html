@@ -40,6 +40,17 @@
   <div class="panel">
     <div class="panel-head">Опубликовать политику в DKG</div>
     <div class="panel-body">
+      <div class="mb-3">
+        <label class="form-label mb-1" style="font-size:.82rem;font-weight:600;">Быстрый пресет</label>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-egfr')">Metformin · eGFR ≥ 30</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-adult-dose')">Metformin · взрослый макс 2000 мг</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-child-dose')">Metformin · детский макс 500 мг</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-adult-dose')">Penicillin · взрослый макс 500 мг</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-child-dose')">Penicillin · детский макс 250 мг</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="clearPreset()">Очистить</button>
+        </div>
+      </div>
       <div class="row g-2">
         <div class="col-sm-3">
           <label>Code <span class="text-muted">(pol:xxx)</span></label>
@@ -266,6 +277,82 @@ async function runSparql(){
   }catch(e){
     document.getElementById('sparql-result').innerHTML=`<div class="alert alert-danger p-2 small">${e.message}</div>`;
   }
+}
+
+const PRESETS = {
+  'metformin-egfr': {
+    code: 'pol:metformin-egfr',
+    name: 'Metformin requires eGFR ≥ 30 mL/min/1.73m²',
+    med: 'metformin',
+    cond: 'eGFR',
+    op: '>=',
+    threshold: 30,
+    cthr: '',
+    dmax: 7776000,
+  },
+  'metformin-adult-dose': {
+    code: 'pol:metformin-adult-dose',
+    name: 'Metformin adult max dosage 2000 mg/day',
+    med: 'metformin',
+    cond: 'dosage',
+    op: '<=',
+    threshold: 2000,
+    cthr: '',
+    dmax: 31536000,
+  },
+  'metformin-child-dose': {
+    code: 'pol:metformin-child-dose',
+    name: 'Metformin pediatric max dosage 500 mg/day (age < 11)',
+    med: 'metformin',
+    cond: 'pediatric dosage',
+    op: '<=',
+    threshold: 500,
+    cthr: '',
+    dmax: 31536000,
+  },
+  'penicillin-adult-dose': {
+    code: 'pol:penicillin-adult-dose',
+    name: 'Penicillin adult max dosage 500 mg per dose',
+    med: 'penicillin',
+    cond: 'dosage',
+    op: '<=',
+    threshold: 500,
+    cthr: '',
+    dmax: 31536000,
+  },
+  'penicillin-child-dose': {
+    code: 'pol:penicillin-child-dose',
+    name: 'Penicillin pediatric max dosage 250 mg per dose (age < 11)',
+    med: 'penicillin',
+    cond: 'pediatric dosage',
+    op: '<=',
+    threshold: 250,
+    cthr: '',
+    dmax: 31536000,
+  },
+};
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  document.getElementById('p-code').value = p.code;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-med').value = p.med;
+  document.getElementById('p-cond').value = p.cond;
+  document.getElementById('p-op').value = p.op;
+  document.getElementById('p-thr').value = p.threshold;
+  document.getElementById('p-cthr').value = p.cthr;
+  document.getElementById('p-dmax').value = p.dmax;
+  document.getElementById('p-msg').innerHTML = '';
+}
+
+function clearPreset() {
+  ['p-code','p-name','p-cond','p-cthr'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-thr').value = '';
+  document.getElementById('p-dmax').value = '';
+  document.getElementById('p-med').value = 'metformin';
+  document.getElementById('p-op').value = '>=';
+  document.getElementById('p-msg').innerHTML = '';
 }
 
 loadPolicies();
