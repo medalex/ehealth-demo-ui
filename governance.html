@@ -38,17 +38,17 @@
 
   <!-- ОПУБЛИКОВАТЬ ПОЛИТИКУ -->
   <div class="panel">
-    <div class="panel-head">Опубликовать политику в DKG</div>
+    <div class="panel-head">Publish Policy to DKG</div>
     <div class="panel-body">
       <div class="mb-3">
-        <label class="form-label mb-1" style="font-size:.82rem;font-weight:600;">Быстрый пресет</label>
+        <label class="form-label mb-1" style="font-size:.82rem;font-weight:600;">Quick preset</label>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-egfr')">Metformin · eGFR ≥ 30</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-adult-dose')">Metformin · взрослый макс 2000 мг</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-child-dose')">Metformin · детский макс 500 мг</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-adult-dose')">Penicillin · взрослый макс 500 мг</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-child-dose')">Penicillin · детский макс 250 мг</button>
-          <button class="btn btn-outline-secondary btn-sm" onclick="clearPreset()">Очистить</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-adult-dose')">Metformin · adult max 2000 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-child-dose')">Metformin · pediatric max 500 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-adult-dose')">Penicillin · adult max 500 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-child-dose')">Penicillin · pediatric max 250 mg</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="clearPreset()">Clear</button>
         </div>
       </div>
       <div class="row g-2">
@@ -85,17 +85,17 @@
           <input id="p-thr" type="number" class="form-control form-control-sm" value="30">
         </div>
         <div class="col-sm-3">
-          <label>Conditional threshold <span class="text-muted">(необязательно)</span></label>
+          <label>Conditional threshold <span class="text-muted">(optional)</span></label>
           <input id="p-cthr" class="form-control form-control-sm" placeholder="age >= 11 ? 2000 : 500">
         </div>
         <div class="col-sm-2">
-          <label>deltaMax <span class="text-muted">(сек)</span></label>
+          <label>deltaMax <span class="text-muted">(sec)</span></label>
           <input id="p-dmax" type="number" class="form-control form-control-sm" value="7776000">
         </div>
         <div class="col-sm-3 d-flex align-items-end">
           <button class="btn btn-main btn-sm w-100" onclick="publishPolicy()">
             <span id="p-spin" class="spinner-border spinner-border-sm d-none me-1"></span>
-            Опубликовать в DKG
+            Publish to DKG
           </button>
         </div>
       </div>
@@ -106,7 +106,7 @@
   <!-- СПИСОК ПОЛИТИК -->
   <div class="panel">
     <div class="panel-head">
-      Политики в DKG
+      Policies in DKG
       <button class="btn btn-outline-secondary btn-sm" onclick="loadPolicies()">↻</button>
     </div>
     <div class="panel-body p-0">
@@ -122,7 +122,7 @@
   <!-- ВСЕ АССЕТЫ В DKG (SPARQL) -->
   <div class="panel">
     <div class="panel-head">
-      Knowledge Assets в DKG
+      Knowledge Assets in DKG
       <button class="btn btn-outline-secondary btn-sm" onclick="loadAssets()">↻</button>
     </div>
     <div class="panel-body p-0">
@@ -137,11 +137,11 @@
 
   <!-- ПРОСМОТР АССЕТА -->
   <div class="panel">
-    <div class="panel-head">Просмотр ассета по UAL</div>
+    <div class="panel-head">View Asset by UAL</div>
     <div class="panel-body">
       <div class="d-flex gap-2">
         <input id="ual-input" class="form-control form-control-sm mono" placeholder="did:dkg:hardhat1:31337/0x.../1/1">
-        <button class="btn btn-main btn-sm" onclick="readAsset()">Читать</button>
+        <button class="btn btn-main btn-sm" onclick="readAsset()">Read</button>
       </div>
       <div id="asset-view" class="mt-2"></div>
     </div>
@@ -149,10 +149,10 @@
 
   <!-- SPARQL-ЗАПРОС -->
   <div class="panel">
-    <div class="panel-head">SPARQL-запрос</div>
+    <div class="panel-head">SPARQL Query</div>
     <div class="panel-body">
       <textarea id="sparql-input" class="form-control form-control-sm mono mb-2" rows="4">SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 30</textarea>
-      <button class="btn btn-main btn-sm" onclick="runSparql()">Выполнить</button>
+      <button class="btn btn-main btn-sm" onclick="runSparql()">Execute</button>
       <div id="sparql-result" class="mt-2"></div>
     </div>
   </div>
@@ -184,7 +184,7 @@ async function publishPolicy(){
   try{
     const r = await post('/rx-governance/policies', body);
     const ual = r?.data?.UAL || r?.UAL || JSON.stringify(r?.data);
-    flash('p-msg', `Опубликовано ✓ UAL: <span class="ual-badge">${ual}</span>`);
+    flash('p-msg', `Published ✓ UAL: <span class="ual-badge">${ual}</span>`);
     loadPolicies();
     loadAssets();
   }catch(e){
@@ -208,7 +208,7 @@ async function loadPolicies(){
           <td>${p.deltaMax??'—'}</td>
           <td><span class="ual-badge" title="${p.ual||''}">${(p.ual||'').slice(0,30)||'—'}</span></td>
         </tr>`).join('')
-      : '<tr><td colspan="7" class="text-center text-muted py-3">Политики не опубликованы</td></tr>';
+      : '<tr><td colspan="7" class="text-center text-muted py-3">No policies published yet</td></tr>';
   }catch(e){
     document.getElementById('pol-list').innerHTML=`<tr><td colspan="7" class="text-danger p-2">${e.message}</td></tr>`;
   }
@@ -227,10 +227,10 @@ async function loadAssets(){
             <td><span class="ual-badge">${ual}</span></td>
             <td>${ts}</td>
             <td class="mono text-muted">${tx}</td>
-            <td><button class="btn btn-outline-secondary btn-sm" onclick='fillUal("${ual}/1")'>Читать</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm" onclick='fillUal("${ual}/1")'>Read</button></td>
           </tr>`;
         }).join('')
-      : '<tr><td colspan="4" class="text-center text-muted py-3">Нет ассетов</td></tr>';
+      : '<tr><td colspan="4" class="text-center text-muted py-3">No assets found</td></tr>';
   }catch(e){
     document.getElementById('asset-list').innerHTML=`<tr><td colspan="4" class="text-danger p-2">${e.message}</td></tr>`;
   }
@@ -245,7 +245,7 @@ function fillUal(ual){
 async function readAsset(){
   const ual = document.getElementById('ual-input').value.trim();
   if(!ual) return;
-  document.getElementById('asset-view').innerHTML='<span class="text-muted small">Загрузка…</span>';
+  document.getElementById('asset-view').innerHTML='<span class="text-muted small">Loading…</span>';
   try{
     const r = await get('/rdf/asset?ual='+encodeURIComponent(ual));
     const data = r?.data ?? r;
@@ -258,14 +258,14 @@ async function readAsset(){
 async function runSparql(){
   const sparql = document.getElementById('sparql-input').value.trim();
   if(!sparql) return;
-  document.getElementById('sparql-result').innerHTML='<span class="text-muted small">Выполняется…</span>';
+  document.getElementById('sparql-result').innerHTML='<span class="text-muted small">Running…</span>';
   try{
     const r = await post('/rdf/query',{sparql});
     const rows = r?.data?.data ?? r?.data ?? r;
     if(Array.isArray(rows) && rows.length > 0){
       const keys = Object.keys(rows[0]);
       document.getElementById('sparql-result').innerHTML=`
-        <div class="text-muted small mb-1">${rows.length} строк</div>
+        <div class="text-muted small mb-1">${rows.length} rows</div>
         <div style="overflow-x:auto">
         <table class="table table-sm table-bordered mb-0">
           <thead class="table-light"><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>
