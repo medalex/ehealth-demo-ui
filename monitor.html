@@ -286,6 +286,7 @@ const seen = {
   rxHosp:     new Map(),    // id → {outcome, stmtHash}
   rxPharm:    new Map(),    // id → status
   doctors:    new Map(),    // id → credentialUal
+  policies:   new Set(),    // id
 };
 
 let events = [];
@@ -492,6 +493,24 @@ async function pollPharmacyRx() {
   }
 }
 
+async function pollPolicies() {
+  const data = await get(`${BASE.mfssia}/api/rx-governance/policies`);
+  const rows = data?.data?.data ?? [];
+  const clean = s => String(s ?? '').replace(/^"|"$/g, '').replace(/\^\^.*$/, '');
+  for (const p of rows) {
+    if (!seen.policies.has(p.id)) {
+      seen.policies.add(p.id);
+      if (!firstPoll) {
+        const code = p.id.replace('urn:rx:policy:', '');
+        push({ icon: '📋', cls: 'ok',
+          title: `Policy published to DKG: ${clean(p.name)}`,
+          meta: `${code} · ${clean(p.clinicalCondition)} ${clean(p.comparisonOperator)} ${clean(p.threshold)}`,
+        });
+      }
+    }
+  }
+}
+
 // ── renderers ─────────────────────────────────────────────────────────────────
 
 function renderTimeline() {
@@ -579,6 +598,7 @@ async function tick() {
     pollDoctors(),
     pollHospitalRx(),
     pollPharmacyRx(),
+    pollPolicies(),
     health(),
   ]);
 
