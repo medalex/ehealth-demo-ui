@@ -42,12 +42,15 @@
     <div class="panel-body">
       <div class="mb-3">
         <label class="form-label mb-1" style="font-size:.82rem;font-weight:600;">Quick preset</label>
+        <div class="text-muted small mb-2" style="font-size:.78rem;">
+          Each policy defines a <strong>requirement</strong>. If the condition is <strong>not met</strong>, the prescription is <strong>blocked</strong> by the ZKP circuit before it reaches the pharmacy.
+        </div>
         <div class="d-flex flex-wrap gap-2">
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-egfr')">Metformin · eGFR ≥ 30</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-adult-dose')">Metformin · adult max 2000 mg</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-child-dose')">Metformin · pediatric max 500 mg</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-adult-dose')">Penicillin · adult max 500 mg</button>
-          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-child-dose')">Penicillin · pediatric max 250 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-egfr')" title="Prescription blocked if patient eGFR &lt; 30">Metformin — block if eGFR &lt; 30</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-adult-dose')" title="Prescription blocked if adult dose exceeds 2000 mg">Metformin — block if adult dose &gt; 2000 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('metformin-child-dose')" title="Prescription blocked if pediatric dose exceeds 500 mg (age &lt; 11)">Metformin — block if child dose &gt; 500 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-adult-dose')" title="Prescription blocked if adult dose exceeds 500 mg">Penicillin — block if adult dose &gt; 500 mg</button>
+          <button class="btn btn-outline-primary btn-sm" onclick="applyPreset('penicillin-child-dose')" title="Prescription blocked if pediatric dose exceeds 250 mg (age &lt; 11)">Penicillin — block if child dose &gt; 250 mg</button>
           <button class="btn btn-outline-secondary btn-sm" onclick="clearPreset()">Clear</button>
         </div>
       </div>
