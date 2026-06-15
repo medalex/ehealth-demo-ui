@@ -198,6 +198,7 @@
     <div class="svc"><span class="dot" id="d-pharmacy"></span>pharmacy-api</div>
     <div class="svc"><span class="dot" id="d-zkp"></span>zkp-prover</div>
     <div class="svc"><span class="dot" id="d-dkg"></span>DKG / blockchain</div>
+    <div class="svc"><span class="dot" id="d-hardhat1"></span>hardhat1 :8545</div>
   </div>
   <div class="live">
     <span class="live-dot"></span>
@@ -275,6 +276,7 @@ let events = [];
 let latestProof = null;
 let doctors = [];
 let firstPoll = true;
+let hardhat1WasUp = null;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -288,6 +290,20 @@ const get = async url => {
 const ping = async url => {
   try { const r = await fetch(url, { signal: AbortSignal.timeout(2000) }); return r.ok; }
   catch { return false; }
+};
+
+const pingHardhat = async () => {
+  try {
+    const r = await fetch('http://localhost:8545', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', method:'eth_chainId', params:[], id:1 }),
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!r.ok) return false;
+    const j = await r.json();
+    return j.result === '0x7a69';
+  } catch { return false; }
 };
 
 const fmt = ts => new Date(ts).toLocaleTimeString();
@@ -315,6 +331,18 @@ async function health() {
     const el = document.getElementById(`d-${k}`);
     if (el) el.className = `dot ${ok ? 'ok' : 'fail'}`;
   }));
+
+  const h1up = await pingHardhat();
+  const el = document.getElementById('d-hardhat1');
+  if (el) el.className = `dot ${h1up ? 'ok' : 'fail'}`;
+  if (!firstPoll && hardhat1WasUp !== null) {
+    if (hardhat1WasUp && !h1up) {
+      push({ icon:'⚡', cls:'fail', title:'hardhat1 DOWN — DKG blockchain unreachable', meta:'Run: docker exec <dkg-node> bash -c "node /opt/ot-node/tools/local-network-setup/run-local-blockchain.js 8545 >> /var/log/ot-node/hardhat1.log 2>&1 &"' });
+    } else if (!hardhat1WasUp && h1up) {
+      push({ icon:'⚡', cls:'ok', title:'hardhat1 RECOVERED — DKG blockchain is back', meta:'Chain ID: 31337 (0x7a69)' });
+    }
+  }
+  hardhat1WasUp = h1up;
 }
 
 // ── pollers ───────────────────────────────────────────────────────────────────
