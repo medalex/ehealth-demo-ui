@@ -62,8 +62,17 @@
     .dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); }
     .dot.fail { background: var(--red); }
 
+    .app-links { display: flex; gap: 5px; margin-left: auto; }
+    .app-link {
+      font-size: 11px; color: var(--blue); text-decoration: none;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 9px;
+      transition: border-color .2s, color .2s;
+    }
+    .app-link:hover { border-color: var(--blue); color: var(--text); }
+
     .live {
-      margin-left: auto; display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 6px;
       font-size: 11px; color: var(--green); white-space: nowrap;
     }
     .live-dot {
@@ -199,6 +208,13 @@
     <div class="svc"><span class="dot" id="d-zkp"></span>zkp-prover</div>
     <div class="svc"><span class="dot" id="d-dkg"></span>DKG / blockchain</div>
     <div class="svc"><span class="dot" id="d-hardhat1"></span>hardhat1 :8545</div>
+  </div>
+  <div class="app-links">
+    <a class="app-link" href="http://localhost:3008" target="_blank">Patient</a>
+    <a class="app-link" href="http://localhost:3009" target="_blank">Lab</a>
+    <a class="app-link" href="http://localhost:3006" target="_blank">Hospital</a>
+    <a class="app-link" href="http://localhost:3007" target="_blank">Pharmacy</a>
+    <a class="app-link" href="/governance.html" target="_blank">Governance</a>
   </div>
   <div class="live">
     <span class="live-dot"></span>
