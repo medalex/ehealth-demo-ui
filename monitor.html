@@ -542,7 +542,7 @@ function renderZKP() {
     if (b > 0) proofKb = `${(b/1024).toFixed(1)} KB`;
   } catch {}
 
-  // Показываем первые 4 публичных сигнала как badges
+  // Display first 4 public signals as badges
   const sigBadges = sigs.slice(0,4).map(s => {
     const str = String(s);
     return `<span class="sig-badge" title="${str}">${str.length>18 ? str.slice(0,8)+'…'+str.slice(-6) : str}</span>`;
@@ -603,7 +603,7 @@ async function tick() {
   ]);
 
   if (firstPoll) {
-    // После первого прохода — показываем ZKP и DKG, но timeline остаётся чистым
+    // After first poll — render ZKP and DKG panels; timeline stays clean
     renderZKP();
     renderDKG();
     firstPoll = false;
