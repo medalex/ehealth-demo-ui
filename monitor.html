@@ -190,6 +190,16 @@
     .cred-ual.ok  { color: var(--blue); }
     .cred-ual.no  { color: var(--yellow); }
 
+    /* MFSSIA access-gate factor chips */
+    .gate-chip {
+      display: inline-block; font-size: 10px; padding: 1px 6px;
+      border-radius: 3px; border: 1px solid var(--border);
+      margin: 1px 4px 1px 0; white-space: nowrap;
+    }
+    .gate-chip.ok { color: var(--green); border-color: var(--green); }
+    .gate-chip.no { color: var(--red);   border-color: var(--red); }
+    .cred-org { font-size: 10px; color: var(--purple); margin-bottom: 3px; }
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg2); }
@@ -256,7 +266,17 @@
       </div>
 
       <div class="section">
-        <div class="sec-title">DKG Doctor Credentials</div>
+        <div class="sec-title">MFSSIA Access Gate · ConsentAccessSet</div>
+        <div id="gate-panel"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="section">
+        <div class="sec-title">Data-Sharing Consents (DKG)</div>
+        <div id="consent-panel"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="section">
+        <div class="sec-title">MFSSIA Physician Registry</div>
         <div id="dkg-panel"><div class="empty">Loading…</div></div>
       </div>
 
@@ -287,11 +307,15 @@ const seen = {
   rxPharm:    new Map(),    // id → status
   doctors:    new Map(),    // id → credentialUal
   policies:   new Set(),    // id
+  consents:   new Set(),    // id (anchored in DKG)
 };
 
 let events = [];
 let latestProof = null;
 let doctors = [];
+let registry = [];          // MFSSIA physician registry (authN source, with organizationId)
+let consents = [];          // patient DataSharingConsents (authZ source)
+let gateDecision = null;    // latest physician-access gate result
 let firstPoll = true;
 let hardhat1WasUp = null;
 
@@ -511,6 +535,55 @@ async function pollPolicies() {
   }
 }
 
+async function pollRegistry() {
+  const data = await get(`${BASE.mfssia}/api/physician-registry`);
+  if (!data) return;
+  registry = data;
+  renderDKG();
+}
+
+async function pollConsents() {
+  const pats = await get(`${BASE.patient}/api/patients`);
+  if (!pats?.length) return;
+  let all = [];
+  for (const p of pats) {
+    const cs = await get(`${BASE.patient}/api/consents/patient/${p.id}`);
+    if (cs) all = all.concat(cs.map(c => ({ ...c, _patient: p })));
+  }
+  consents = all;
+  renderConsents();
+
+  // Timeline event when a consent gets anchored in DKG
+  if (firstPoll) { all.forEach(c => seen.consents.add(c.id)); return; }
+  for (const c of all) {
+    if (c.dkgUal && !seen.consents.has(c.id)) {
+      seen.consents.add(c.id);
+      push({ icon:'🔓', cls:'ok',
+        title: `Consent anchored in DKG → ${c.organizationId}`,
+        meta: `⛓ ${c.dkgUal}`,
+        ts: new Date(c.grantedAt||Date.now()).getTime() });
+    }
+  }
+}
+
+async function pollAccessGate() {
+  // Run the two-factor gate live for a registered physician ↔ first patient pair
+  if (!registry.length) return;
+  const pats = await get(`${BASE.patient}/api/patients`);
+  if (!pats?.length) return;
+  const doc = registry[0], pat = pats[0];
+  try {
+    const r = await fetch(`${BASE.mfssia}/api/physician-access/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doctorId: doc.id, patientId: pat.id }),
+      signal: AbortSignal.timeout(2500),
+    });
+    gateDecision = r.ok ? { ...(await r.json()), _doc: doc, _pat: pat } : null;
+  } catch { gateDecision = null; }
+  renderGate();
+}
+
 // ── renderers ─────────────────────────────────────────────────────────────────
 
 function renderTimeline() {
@@ -576,17 +649,65 @@ function renderZKP() {
     </div>`;
 }
 
+function renderGate() {
+  const el = document.getElementById('gate-panel');
+  const d = gateDecision;
+  if (!d) { el.innerHTML = '<div class="empty">Gate unavailable</div>'; return; }
+  const chip = (ok, label) => `<span class="gate-chip ${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} ${label}</span>`;
+  el.innerHTML = `
+    <div class="zkp-box">
+      <div class="zkp-outcome ${d.access ? 'pass' : 'fail'}">
+        ${d.access ? '✓ ACCESS GRANTED' : '✗ ACCESS DENIED'}
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">physician</span>
+        <span class="zkp-val">Dr. ${d._doc.firstName} ${d._doc.lastName}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">patient</span>
+        <span class="zkp-val">${d._pat.firstName} ${d._pat.lastName}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">factors</span>
+        <span class="zkp-val">${chip(d.authn, 'C-DOC-AUTH')} ${chip(d.authz, 'C-DOC-AUTHZ')}</span>
+      </div>
+      <div class="zkp-row">
+        <span class="zkp-lbl">org</span>
+        <span class="zkp-val">${d.organizationId || '—'}</span>
+      </div>
+    </div>`;
+}
+
+function renderConsents() {
+  const el = document.getElementById('consent-panel');
+  if (!consents.length) { el.innerHTML = '<div class="empty">No consents</div>'; return; }
+  el.innerHTML = consents.map(c => `
+    <div class="cred-box">
+      <div class="cred-name">→ ${c.organizationId}</div>
+      <div class="cred-spec">${c._patient.firstName} ${c._patient.lastName}</div>
+      ${c.dkgUal
+        ? `<div class="cred-ual ok">⛓ ${c.dkgUal}</div>`
+        : `<div class="cred-ual no">⚠ Not anchored in DKG</div>`}
+    </div>`).join('');
+}
+
 function renderDKG() {
   const el = document.getElementById('dkg-panel');
   if (!doctors.length) { el.innerHTML = '<div class="empty">No doctors</div>'; return; }
-  el.innerHTML = doctors.map(d => `
+  const regIds = new Set(registry.map(p => p.id.toLowerCase()));
+  el.innerHTML = doctors.map(d => {
+    const reg = registry.find(p => p.id.toLowerCase() === d.id.toLowerCase());
+    const inReg = regIds.has(d.id.toLowerCase());
+    return `
     <div class="cred-box">
       <div class="cred-name">${d.firstName} ${d.lastName}</div>
       <div class="cred-spec">${d.specialty} · ${d.licenseNumber}</div>
-      ${d.credentialUal
-        ? `<div class="cred-ual ok">✓ ${d.credentialUal}</div>`
-        : `<div class="cred-ual no">⚠ Not registered on DKG</div>`}
-    </div>`).join('');
+      ${reg ? `<div class="cred-org">🏥 ${reg.organizationId}</div>` : ''}
+      ${inReg
+        ? `<div class="cred-ual ok">✓ In MFSSIA registry (C-DOC-AUTH)</div>`
+        : `<div class="cred-ual no">⚠ Not in MFSSIA registry — access denied</div>`}
+    </div>`;
+  }).join('');
 }
 
 // ── loop ──────────────────────────────────────────────────────────────────────
@@ -599,13 +720,18 @@ async function tick() {
     pollHospitalRx(),
     pollPharmacyRx(),
     pollPolicies(),
+    pollRegistry(),
+    pollConsents(),
+    pollAccessGate(),
     health(),
   ]);
 
   if (firstPoll) {
-    // After first poll — render ZKP and DKG panels; timeline stays clean
+    // After first poll — render panels; timeline stays clean
     renderZKP();
     renderDKG();
+    renderGate();
+    renderConsents();
     firstPoll = false;
   }
 
