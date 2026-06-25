@@ -538,7 +538,7 @@ async function pollPolicies() {
 async function pollRegistry() {
   const data = await get(`${BASE.mfssia}/api/physician-registry`);
   if (!data) return;
-  registry = data;
+  registry = data.data ?? data;   // mfssia wraps responses in { success, data }
   renderDKG();
 }
 
@@ -579,7 +579,13 @@ async function pollAccessGate() {
       body: JSON.stringify({ doctorId: doc.id, patientId: pat.id }),
       signal: AbortSignal.timeout(2500),
     });
-    gateDecision = r.ok ? { ...(await r.json()), _doc: doc, _pat: pat } : null;
+    if (r.ok) {
+      const j = await r.json();
+      const dec = j.data ?? j;   // mfssia wraps responses in { success, data }
+      gateDecision = { ...dec, _doc: doc, _pat: pat };
+    } else {
+      gateDecision = null;
+    }
   } catch { gateDecision = null; }
   renderGate();
 }
