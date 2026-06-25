@@ -261,8 +261,12 @@ async function loadAssets(){
     document.getElementById('asset-list').innerHTML = rows.length
       ? rows.map(row=>{
           const ual = row.asset||'';
-          const ts  = row.published ? new Date(row.published.replace(/^"|"$/g,'')).toLocaleString() : '—';
-          const tx  = row.tx ? row.tx.replace(/^"|"$/g,'').slice(0,14)+'…' : '—';
+          // RDF literal: "2026-..Z"^^<xsd:dateTime> — strip the ^^type suffix and quotes before parsing
+          const rdfLit = v => String(v ?? '').replace(/\^\^.*$/,'').replace(/^"|"$/g,'');
+          const iso = rdfLit(row.published);
+          const d   = iso ? new Date(iso) : null;
+          const ts  = d && !isNaN(d) ? d.toLocaleString() : (iso || '—');
+          const tx  = row.tx ? rdfLit(row.tx).slice(0,14)+'…' : '—';
           return `<tr>
             <td><span class="ual-badge">${ual}</span></td>
             <td>${ts}</td>
