@@ -218,6 +218,7 @@
     <div class="svc"><span class="dot" id="d-zkp"></span>zkp-prover</div>
     <div class="svc"><span class="dot" id="d-dkg"></span>DKG / blockchain</div>
     <div class="svc"><span class="dot" id="d-hardhat1"></span>hardhat1 :8545</div>
+    <div class="svc"><span class="dot" id="d-evm"></span>decision-registry :8546</div>
   </div>
   <div class="app-links">
     <a class="app-link" href="http://localhost:3008" target="_blank">Patient</a>
@@ -280,6 +281,11 @@
         <div id="dkg-panel"><div class="empty">Loading…</div></div>
       </div>
 
+      <div class="section">
+        <div class="sec-title">On-Chain Decision Log · DecisionRegistry :8546</div>
+        <div id="evm-panel"><div class="empty">Loading…</div></div>
+      </div>
+
     </div>
   </div>
 
@@ -293,6 +299,7 @@ const BASE = {
   pharmacy: 'http://localhost:3004',
   zkp:      'http://localhost:3005',
   mfssia:   'http://localhost:4000',
+  evm:      'http://localhost:3010',
 };
 
 const DRUGS = {103:'Penicillin', 105:'Metformin'};
@@ -316,6 +323,7 @@ let doctors = [];
 let registry = [];          // MFSSIA physician registry (authN source, with organizationId)
 let consents = [];          // patient DataSharingConsents (authZ source)
 let gateDecision = null;    // latest physician-access gate result
+let decisionLog = [];       // on-chain DecisionRegistry log (recorded decisions)
 let firstPoll = true;
 let hardhat1WasUp = null;
 
@@ -366,6 +374,7 @@ async function health() {
     ['pharmacy', `${BASE.pharmacy}/api/prescriptions`],
     ['zkp',      `${BASE.zkp}/health`],
     ['dkg',      `${BASE.mfssia}/api/api/infrastructure/healthcheck`],
+    ['evm',      `${BASE.evm}/health`],
   ];
   await Promise.all(checks.map(async ([k, url]) => {
     const ok = await ping(url);
@@ -716,6 +725,42 @@ function renderDKG() {
   }).join('');
 }
 
+// On-chain decision log: pulls every DecisionRecorded event from the EVM node.
+async function pollDecisionLog() {
+  const data = await get(`${BASE.evm}/decisions`);
+  const next = data && Array.isArray(data.decisions) ? data.decisions : [];
+  // Announce newly recorded decisions on the timeline.
+  if (!firstPoll && next.length > decisionLog.length) {
+    next.slice(decisionLog.length).forEach(d => push({
+      icon: '⛓', cls: d.outcome ? 'ok' : 'fail',
+      title: `On-chain decision recorded — ${d.outcome ? 'ACCEPT' : 'REJECT'} (block #${d.blockNumber})`,
+      meta: `stmtHash ${d.stmtHash.slice(0, 12)}…`,
+    }));
+  }
+  decisionLog = next;
+  renderDecisionLog();
+}
+
+function renderDecisionLog() {
+  const el = document.getElementById('evm-panel');
+  if (!el) return;
+  if (!decisionLog.length) {
+    el.innerHTML = '<div class="empty">No decisions recorded on-chain yet</div>';
+    return;
+  }
+  el.innerHTML = decisionLog.slice().reverse().map(d => {
+    const short = d.stmtHash.slice(0, 10) + '…' + d.stmtHash.slice(-6);
+    const cls = d.outcome ? 'ok' : 'no';
+    const verdict = d.outcome ? '✓ ACCEPT' : '⚠ REJECT';
+    return `
+    <div class="cred-box">
+      <div class="cred-name">block #${d.blockNumber} · <span class="cred-ual ${cls}">${verdict}</span></div>
+      <div class="cred-spec">stmtHash ${short}</div>
+      <div class="cred-org">tx ${d.txHash.slice(0, 12)}…</div>
+    </div>`;
+  }).join('');
+}
+
 // ── loop ──────────────────────────────────────────────────────────────────────
 
 async function tick() {
@@ -729,6 +774,7 @@ async function tick() {
     pollRegistry(),
     pollConsents(),
     pollAccessGate(),
+    pollDecisionLog(),
     health(),
   ]);
 
@@ -738,6 +784,7 @@ async function tick() {
     renderDKG();
     renderGate();
     renderConsents();
+    renderDecisionLog();
     firstPoll = false;
   }
 
