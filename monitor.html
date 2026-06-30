@@ -267,7 +267,7 @@
       </div>
 
       <div class="section">
-        <div class="sec-title">MFSSIA Access Gate · ConsentAccessSet</div>
+        <div class="sec-title">MFSSIA Access Gate Log · ConsentAccessSet (challenge → response)</div>
         <div id="gate-panel"><div class="empty">Loading…</div></div>
       </div>
 
@@ -322,7 +322,7 @@ let latestProof = null;
 let doctors = [];
 let registry = [];          // MFSSIA physician registry (authN source, with organizationId)
 let consents = [];          // patient DataSharingConsents (authZ source)
-let gateDecision = null;    // latest physician-access gate result
+let gateLog = [];           // recent physician-access gate decisions (challenge/response log)
 let decisionLog = [];       // on-chain DecisionRegistry log (recorded decisions)
 const stmtDrug = new Map(); // hex stmtHash → drug label (off-chain correlation for the log)
 
@@ -583,26 +583,17 @@ async function pollConsents() {
 }
 
 async function pollAccessGate() {
-  // Run the two-factor gate live for a registered physician ↔ first patient pair
-  if (!registry.length) return;
-  const pats = await get(`${BASE.patient}/api/patients`);
-  if (!pats?.length) return;
-  const doc = registry[0], pat = pats[0];
-  try {
-    const r = await fetch(`${BASE.mfssia}/api/physician-access/check`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doctorId: doc.id, patientId: pat.id }),
-      signal: AbortSignal.timeout(2500),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      const dec = j.data ?? j;   // mfssia wraps responses in { success, data }
-      gateDecision = { ...dec, _doc: doc, _pat: pat };
-    } else {
-      gateDecision = null;
-    }
-  } catch { gateDecision = null; }
+  // Show the LATEST REAL gate checks performed by the hospital flow (challenge/response log),
+  // resolving physician/patient names from already-polled data.
+  const data = await get(`${BASE.mfssia}/api/physician-access/recent?limit=8`);
+  const list = (data?.data ?? data) || [];
+  if (!Array.isArray(list)) { gateLog = []; renderGate(); return; }
+  const pats = (await get(`${BASE.patient}/api/patients`)) || [];
+  gateLog = list.map(d => ({
+    ...d,
+    _doc: (doctors || []).find(x => x.id === d.doctorId) || { firstName: 'Doctor', lastName: (d.doctorId || '').slice(0, 8) },
+    _pat: pats.find(x => x.id === d.patientId) || { firstName: 'Patient', lastName: (d.patientId || '').slice(0, 8) },
+  }));
   renderGate();
 }
 
@@ -673,31 +664,20 @@ function renderZKP() {
 
 function renderGate() {
   const el = document.getElementById('gate-panel');
-  const d = gateDecision;
-  if (!d) { el.innerHTML = '<div class="empty">Gate unavailable</div>'; return; }
+  if (!gateLog.length) { el.innerHTML = '<div class="empty">No access checks yet — generate a prescription</div>'; return; }
   const chip = (ok, label) => `<span class="gate-chip ${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} ${label}</span>`;
-  el.innerHTML = `
-    <div class="zkp-box">
-      <div class="zkp-outcome ${d.access ? 'pass' : 'fail'}">
-        ${d.access ? '✓ ACCESS GRANTED' : '✗ ACCESS DENIED'}
+  // Challenge/response log: each entry is one ConsentAccessSet challenge and its factor responses.
+  el.innerHTML = gateLog.map(d => `
+    <div class="cred-box">
+      <div class="cred-name">
+        ${d.access ? '<span class="cred-ual ok">✓ GRANTED</span>' : '<span class="cred-ual no">✗ DENIED</span>'}
+        <span style="float:right;color:#888;font-size:10px">${d.at ? new Date(d.at).toLocaleTimeString() : ''}</span>
       </div>
-      <div class="zkp-row">
-        <span class="zkp-lbl">physician</span>
-        <span class="zkp-val">Dr. ${d._doc.firstName} ${d._doc.lastName}</span>
-      </div>
-      <div class="zkp-row">
-        <span class="zkp-lbl">patient</span>
-        <span class="zkp-val">${d._pat.firstName} ${d._pat.lastName}</span>
-      </div>
-      <div class="zkp-row">
-        <span class="zkp-lbl">factors</span>
-        <span class="zkp-val">${chip(d.authn, 'C-DOC-AUTH')} ${chip(d.authz, 'C-DOC-AUTHZ')}</span>
-      </div>
-      <div class="zkp-row">
-        <span class="zkp-lbl">org</span>
-        <span class="zkp-val">${d.organizationId || '—'}</span>
-      </div>
-    </div>`;
+      <div class="cred-spec">Dr. ${d._doc.firstName} ${d._doc.lastName} → ${d._pat.firstName} ${d._pat.lastName} · ${d.organizationId || '—'}</div>
+      <div style="margin:3px 0">${chip(d.authn, 'C-DOC-AUTH')} ${chip(d.authz, 'C-DOC-AUTHZ')}</div>
+      <div class="cred-org" style="font-size:10px">challenge: ${d.challengeSet || 'ConsentAccessSet'} · nonce ${(d.nonce || '').slice(0, 14)}…</div>
+      ${!d.access ? `<div style="font-size:10px;color:#d88">↳ ${d.reason || ''}</div>` : ''}
+    </div>`).join('');
 }
 
 function renderConsents() {
