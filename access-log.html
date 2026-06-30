@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MFSSIA · ConsentAccessSet — Challenge / Response</title>
+  <style>
+    :root {
+      --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --border:#30363d;
+      --text:#e6edf3; --muted:#7d8590; --green:#3fb950; --red:#f85149;
+      --yellow:#d29922; --blue:#58a6ff; --purple:#bc8cff;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',sans-serif;font-size:13px}
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:14px}
+    .topbar-title{font-weight:700;font-size:15px}
+    .topbar a{color:var(--blue);text-decoration:none;font-size:12px;border:1px solid var(--border);border-radius:4px;padding:3px 9px}
+    .live{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--green);font-size:12px}
+    .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .wrap{max-width:1200px;margin:0 auto;padding:18px}
+    .panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:18px}
+    .panel-head{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+    .panel-body{padding:16px}
+
+    /* ── Challenge/response graph ── */
+    .graph{display:flex;flex-direction:column;align-items:center;gap:0}
+    .node{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:240px}
+    .node .t{font-weight:700;font-size:13px}
+    .node .s{color:var(--muted);font-size:11px;margin-top:2px}
+    .node.req{border-color:var(--blue)}
+    .node.chal{border-color:var(--purple)}
+    .arrow{color:var(--muted);font-size:18px;line-height:1.1;margin:2px 0}
+    .factors{display:flex;gap:40px;justify-content:center;position:relative}
+    .factor{background:var(--bg3);border:2px solid var(--border);border-radius:8px;padding:12px 16px;min-width:230px;text-align:center}
+    .factor.ok{border-color:var(--green);box-shadow:0 0 10px rgba(63,185,80,.25)}
+    .factor.no{border-color:var(--red);box-shadow:0 0 10px rgba(248,81,73,.25)}
+    .factor .t{font-weight:700}
+    .factor .s{color:var(--muted);font-size:11px;margin-top:3px}
+    .factor .r{margin-top:6px;font-weight:700}
+    .factor.ok .r{color:var(--green)} .factor.no .r{color:var(--red)} .factor .r.idle{color:var(--muted)}
+    .verdict{margin-top:6px;padding:12px 22px;border-radius:8px;font-weight:800;font-size:15px}
+    .verdict.ok{background:rgba(63,185,80,.15);color:var(--green);border:1px solid var(--green)}
+    .verdict.no{background:rgba(248,81,73,.15);color:var(--red);border:1px solid var(--red)}
+    .verdict.idle{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}
+    .meta{margin-top:10px;color:var(--muted);font-size:11px;text-align:center;font-family:monospace;word-break:break-all}
+    .reason{margin-top:6px;color:#d88;font-size:11px;text-align:center}
+
+    /* ── Log table ── */
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+    th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+    tbody tr{cursor:pointer}
+    tbody tr:hover{background:var(--bg3)}
+    tbody tr.sel{background:rgba(88,166,255,.12)}
+    .chip{font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600}
+    .chip.ok{background:rgba(63,185,80,.15);color:var(--green)}
+    .chip.no{background:rgba(248,81,73,.15);color:var(--red)}
+    .mono{font-family:monospace;color:var(--muted)}
+    .empty{color:var(--muted);text-align:center;padding:24px}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-title">MFSSIA · ConsentAccessSet</div>
+    <a href="/monitor.html">← Monitor</a>
+    <div class="live"><span class="live-dot"></span>LIVE <span id="upd"></span></div>
+  </div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div class="panel-head">Challenge → Response graph <span id="graph-sub" style="text-transform:none;color:var(--blue)"></span></div>
+      <div class="panel-body">
+        <div class="graph" id="graph"><div class="empty">No access checks yet — generate a prescription in the Hospital app</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">Access decision log · latest first (click a row to view its graph)</div>
+      <div class="panel-body" style="padding:0">
+        <table>
+          <thead><tr>
+            <th>Time</th><th>Physician</th><th>Patient</th><th>Org</th>
+            <th>C-DOC-AUTH</th><th>C-DOC-AUTHZ</th><th>Verdict</th><th>Nonce</th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+const BASE = { mfssia:'http://localhost:4000', hospital:'http://localhost:3003', patient:'http://localhost:3001' };
+const get = async u => { try { const r = await fetch(u,{signal:AbortSignal.timeout(2500)}); return r.ok?r.json():null; } catch { return null; } };
+
+let log = [], doctors = [], patients = [], selected = 0;
+
+const docName = id => { const d = doctors.find(x=>x.id===id); return d?`Dr. ${d.firstName} ${d.lastName}`:`Doctor ${(id||'').slice(0,8)}`; };
+const patName = id => { const p = patients.find(x=>x.id===id); return p?`${p.firstName} ${p.lastName}`:`Patient ${(id||'').slice(0,8)}`; };
+
+function renderGraph() {
+  const el = document.getElementById('graph');
+  const sub = document.getElementById('graph-sub');
+  if (!log.length) { el.innerHTML = '<div class="empty">No access checks yet — generate a prescription in the Hospital app</div>'; sub.textContent=''; return; }
+  const d = log[selected] || log[0];
+  sub.textContent = ` · ${docName(d.doctorId)} → ${patName(d.patientId)}`;
+  const fac = (ok, t, s) => `
+    <div class="factor ${ok?'ok':'no'}">
+      <div class="t">${t}</div><div class="s">${s}</div>
+      <div class="r">${ok?'✓ response: pass':'✗ response: fail'}</div>
+    </div>`;
+  el.innerHTML = `
+    <div class="node req"><div class="t">Request</div><div class="s">${docName(d.doctorId)} → ${patName(d.patientId)} · ${d.organizationId||'—'}</div></div>
+    <div class="arrow">▼</div>
+    <div class="node chal"><div class="t">Challenge: ConsentAccessSet</div><div class="s">aggregation: ALL_MANDATORY · nonce ${(d.nonce||'').slice(0,18)}…</div></div>
+    <div class="arrow">▼ issues two factor challenges ▼</div>
+    <div class="factors">
+      ${fac(d.authn,'C-DOC-AUTH','physician ∈ MFSSIA registry')}
+      ${fac(d.authz,'C-DOC-AUTHZ','consent ∈ DKG covers org')}
+    </div>
+    <div class="arrow">▼ AND ▼</div>
+    <div class="verdict ${d.access?'ok':'no'}">${d.access?'✓ ACCESS GRANTED':'✗ ACCESS DENIED'}</div>
+    ${!d.access?`<div class="reason">↳ ${d.reason||''}</div>`:''}
+    <div class="meta">challengeSet=${d.challengeSet||'ConsentAccessSet'} · at=${d.at?new Date(d.at).toLocaleString():'—'}</div>`;
+}
+
+function renderTable() {
+  const el = document.getElementById('rows');
+  if (!log.length) { el.innerHTML = '<tr><td colspan="8" class="empty">No access checks yet</td></tr>'; return; }
+  const chip = ok => `<span class="chip ${ok?'ok':'no'}">${ok?'✓':'✗'}</span>`;
+  el.innerHTML = log.map((d,i)=>`
+    <tr class="${i===selected?'sel':''}" onclick="select(${i})">
+      <td>${d.at?new Date(d.at).toLocaleTimeString():'—'}</td>
+      <td>${docName(d.doctorId)}</td>
+      <td>${patName(d.patientId)}</td>
+      <td>${d.organizationId||'—'}</td>
+      <td>${chip(d.authn)} C-DOC-AUTH</td>
+      <td>${chip(d.authz)} C-DOC-AUTHZ</td>
+      <td><span class="chip ${d.access?'ok':'no'}">${d.access?'GRANTED':'DENIED'}</span></td>
+      <td class="mono">${(d.nonce||'').slice(0,12)}…</td>
+    </tr>`).join('');
+}
+
+function select(i){ selected = i; renderGraph(); renderTable(); }
+
+async function tick() {
+  const [recent, docs, pats] = await Promise.all([
+    get(`${BASE.mfssia}/api/physician-access/recent?limit=25`),
+    get(`${BASE.hospital}/api/doctors`),
+    get(`${BASE.patient}/api/patients`),
+  ]);
+  if (Array.isArray(docs)) doctors = docs;
+  if (Array.isArray(pats)) patients = pats;
+  const next = (recent?.data ?? recent) || [];
+  if (Array.isArray(next)) {
+    // Keep selection stable when the list grows (new entries prepend).
+    const grew = next.length - log.length;
+    log = next;
+    if (grew > 0 && selected !== 0) selected += grew;
+  }
+  renderGraph(); renderTable();
+  document.getElementById('upd').textContent = new Date().toLocaleTimeString();
+  setTimeout(tick, 2000);
+}
+tick();
+</script>
+</body>
+</html>
