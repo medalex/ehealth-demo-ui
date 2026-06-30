@@ -121,9 +121,9 @@ function renderGraph() {
     <div class="arrow">▼ AND ▼</div>
     <div class="verdict ${d.access?'ok':'no'}">${d.access?'✓ ACCESS GRANTED':'✗ ACCESS DENIED'}</div>
     ${!d.access?`<div class="reason">↳ ${d.reason||''}</div>`:''}
-    <div class="meta">challengeSet=${d.challengeSet||'ConsentAccessSet'} · at=${d.at?new Date(d.at).toLocaleString():'—'}</div>`;
+    <div class="meta">challengeSet=${d.challengeSet||'ConsentAccessSet'} · at=${d.at?new Date(d.at).toLocaleString():'—'}</div>
     <div id="dkg-docs" style="margin-top:12px"></div>
-    `;
+  `;
 
   // Load DKG consent documents for the selected patient and render below the graph
   (async () => {
