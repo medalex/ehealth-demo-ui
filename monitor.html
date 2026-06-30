@@ -324,6 +324,11 @@ let registry = [];          // MFSSIA physician registry (authN source, with org
 let consents = [];          // patient DataSharingConsents (authZ source)
 let gateDecision = null;    // latest physician-access gate result
 let decisionLog = [];       // on-chain DecisionRegistry log (recorded decisions)
+const stmtDrug = new Map(); // hex stmtHash → drug label (off-chain correlation for the log)
+
+// Decimal field-element stmtHash → bytes32 hex (how it is stored on-chain), for matching.
+function stmtToHex(dec){ try { return '0x' + BigInt(dec).toString(16).padStart(64,'0'); } catch { return String(dec); } }
+function toggleDecision(i){ const d = document.getElementById('dec-detail-'+i); if (d) d.style.display = d.style.display === 'none' ? '' : 'none'; }
 let firstPoll = true;
 let hardhat1WasUp = null;
 
@@ -466,6 +471,7 @@ async function pollHospitalRx() {
     }
   }
 
+  data.forEach(r => { if (r.stmtHash) stmtDrug.set(stmtToHex(r.stmtHash), `${drugName(r.drugId)} ${r.dosage}`); });
   if (firstPoll) { data.forEach(r => seen.rxHosp.set(r.id, {outcome:r.outcome, stmtHash:r.stmtHash})); return; }
 
   for (const rx of data) {
@@ -495,6 +501,7 @@ async function pollPharmacyRx() {
   document.getElementById('c-pend').textContent = data.filter(r=>r.status==='Received').length;
   document.getElementById('c-done').textContent = data.filter(r=>r.status==='Verified'||r.status==='Dispensed').length;
 
+  data.forEach(r => { if (r.stmtHash) stmtDrug.set(stmtToHex(r.stmtHash), r.drugName || drugName(r.drugId)); });
   if (firstPoll) { data.forEach(r => seen.rxPharm.set(r.id, r.status)); return; }
 
   for (const rx of data) {
@@ -729,6 +736,7 @@ function renderDKG() {
 async function pollDecisionLog() {
   const data = await get(`${BASE.evm}/decisions`);
   const next = data && Array.isArray(data.decisions) ? data.decisions : [];
+  const changed = next.length !== decisionLog.length;
   // Announce newly recorded decisions on the timeline.
   if (!firstPoll && next.length > decisionLog.length) {
     next.slice(decisionLog.length).forEach(d => push({
@@ -738,7 +746,8 @@ async function pollDecisionLog() {
     }));
   }
   decisionLog = next;
-  renderDecisionLog();
+  // Only re-render when the (append-only) log changes, so expanded detail rows stay open.
+  if (changed) renderDecisionLog();
 }
 
 function renderDecisionLog() {
@@ -748,15 +757,26 @@ function renderDecisionLog() {
     el.innerHTML = '<div class="empty">No decisions recorded on-chain yet</div>';
     return;
   }
-  el.innerHTML = decisionLog.slice().reverse().map(d => {
+  const mono = 'font-family:monospace;word-break:break-all';
+  el.innerHTML = decisionLog.slice().reverse().map((d, i) => {
     const short = d.stmtHash.slice(0, 10) + '…' + d.stmtHash.slice(-6);
     const cls = d.outcome ? 'ok' : 'no';
     const verdict = d.outcome ? '✓ ACCEPT' : '⚠ REJECT';
+    const drug = stmtDrug.get((d.stmtHash || '').toLowerCase());
+    const when = d.timestamp ? new Date(d.timestamp * 1000).toLocaleString() : '—';
     return `
-    <div class="cred-box">
-      <div class="cred-name">block #${d.blockNumber} · <span class="cred-ual ${cls}">${verdict}</span></div>
+    <div class="cred-box" style="cursor:pointer" onclick="toggleDecision(${i})" title="Click for details">
+      <div class="cred-name">block #${d.blockNumber} · <span class="cred-ual ${cls}">${verdict}</span>${drug ? ` · <span style="color:#7aa2f7">${drug}</span>` : ''} <span style="float:right;color:#888">▾</span></div>
       <div class="cred-spec">stmtHash ${short}</div>
-      <div class="cred-org">tx ${d.txHash.slice(0, 12)}…</div>
+      <div id="dec-detail-${i}" style="display:none;margin-top:6px;font-size:11px;line-height:1.6">
+        <div><b>Decision:</b> ${d.outcome ? 'ACCEPT (outcome=1)' : 'REJECT (outcome=0)'}</div>
+        <div><b>Prescription:</b> ${drug || '<span style="color:#888">unknown — off-chain only</span>'}</div>
+        <div><b>stmtHash:</b> <span style="${mono}">${d.stmtHash}</span></div>
+        <div><b>Recorded by:</b> <span style="${mono}">${d.verifier || '—'}</span></div>
+        <div><b>When:</b> ${when}</div>
+        <div><b>Block / Tx:</b> #${d.blockNumber} · <span style="${mono}">${d.txHash}</span></div>
+        <div style="color:#888;margin-top:4px">stmtHash is a privacy-preserving commitment — no patient, drug or dose is stored on-chain. The drug shown above is correlated off-chain from this monitor's data.</div>
+      </div>
     </div>`;
   }).join('');
 }
