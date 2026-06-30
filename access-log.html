@@ -122,7 +122,32 @@ function renderGraph() {
     <div class="verdict ${d.access?'ok':'no'}">${d.access?'✓ ACCESS GRANTED':'✗ ACCESS DENIED'}</div>
     ${!d.access?`<div class="reason">↳ ${d.reason||''}</div>`:''}
     <div class="meta">challengeSet=${d.challengeSet||'ConsentAccessSet'} · at=${d.at?new Date(d.at).toLocaleString():'—'}</div>`;
-}
+    <div id="dkg-docs" style="margin-top:12px"></div>
+    `;
+
+  // Load DKG consent documents for the selected patient and render below the graph
+  (async () => {
+    try {
+      const docs = await get(`${BASE.mfssia}/api/physician-access/consents/${d.patientId}`);
+      const elDocs = document.getElementById('dkg-docs');
+      if (!elDocs) return;
+      if (!docs || !Array.isArray(docs) || docs.length === 0) {
+        elDocs.innerHTML = '<div class="empty">No DKG consent documents found</div>';
+        return;
+      }
+      elDocs.innerHTML = docs.map(c => `
+        <div class="node" style="text-align:left;padding:8px">
+          <div class="t" style="font-weight:700">${c['@id'] || c.id || ''}</div>
+          <div class="s">Patient: ${c['rx:patient'] || c.patient || ''} · Covers: ${c['rx:consentCovers'] || c.consentCovers || ''}</div>
+          <div class="meta mono">grantedAt: ${c['rx:grantedAt']||c.grantedAt||'—'} · validUntil: ${c['rx:validUntil']||c.validUntil||'—'}</div>
+          <pre style="margin-top:6px;color:var(--muted);font-size:12px;white-space:pre-wrap">${JSON.stringify(c, null, 2)}</pre>
+        </div>
+      `).join('');
+    } catch (e) {
+      const elDocs = document.getElementById('dkg-docs');
+      if (elDocs) elDocs.innerHTML = `<div class="empty">Error loading DKG documents: ${e.message}</div>`;
+    }
+  })();
 
 function renderTable() {
   const el = document.getElementById('rows');
